@@ -1,8 +1,10 @@
-robot0_measurements: $(find dpgo_ros)/data/tunnels/robot0/measurements.csv
-robot1_measurements: $(find dpgo_ros)/data/tunnels/robot1/measurements.csv
-robot2_measurements: $(find dpgo_ros)/data/tunnels/robot2/measurements.csv
-robot3_measurements: $(find dpgo_ros)/data/tunnels/robot3/measurements.csv
-robot4_measurements: $(find dpgo_ros)/data/tunnels/robot4/measurements.csv
-robot5_measurements: $(find dpgo_ros)/data/tunnels/robot5/measurements.csv
-robot6_measurements: $(find dpgo_ros)/data/tunnels/robot6/measurements.csv
-robot7_measurements: $(find dpgo_ros)/data/tunnels/robot7/measurements.csv
+/**:
+  ros__parameters:
+    robot0_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot0/measurements.csv
+    robot1_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot1/measurements.csv
+    robot2_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot2/measurements.csv
+    robot3_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot3/measurements.csv
+    robot4_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot4/measurements.csv
+    robot5_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot5/measurements.csv
+    robot6_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot6/measurements.csv
+    robot7_measurements: $(find-pkg-share dpgo_ros)/data/tunnels/robot7/measurements.csv

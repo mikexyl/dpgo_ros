@@ -1,88 +1,85 @@
 #!/usr/bin/env python3
 
+import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node, PushRosNamespace
-from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
-import os
+from launch_ros.substitutions import FindPackageShare as RosFindPackageShare
+
 
 def generate_launch_description():
-    # Launch arguments
-    num_robots_arg = DeclareLaunchArgument(
+    # Get package share directory
+    pkg_share = get_package_share_directory('dpgo_ros')
+    
+    # Declare launch arguments
+    declare_num_robots_arg = DeclareLaunchArgument(
         'num_robots',
         default_value='5',
         description='Number of robots'
     )
     
-    g2o_dataset_arg = DeclareLaunchArgument(
+    declare_g2o_dataset_arg = DeclareLaunchArgument(
         'g2o_dataset',
         default_value='sphere2500',
         description='G2O dataset name'
     )
     
-    debug_arg = DeclareLaunchArgument(
+    declare_debug_arg = DeclareLaunchArgument(
         'debug',
         default_value='true',
-        description='Enable debug mode'
+        description='Debug flag'
     )
     
-    verbose_arg = DeclareLaunchArgument(
+    declare_verbose_arg = DeclareLaunchArgument(
         'verbose',
         default_value='true',
-        description='Enable verbose output'
+        description='Verbose flag'
     )
     
-    publish_iterate_arg = DeclareLaunchArgument(
+    declare_publish_iterate_arg = DeclareLaunchArgument(
         'publish_iterate',
         default_value='true',
-        description='Publish intermediate iterations'
+        description='Publish iterate flag'
     )
     
-    rgd_stepsize_arg = DeclareLaunchArgument(
+    declare_rgd_stepsize_arg = DeclareLaunchArgument(
         'RGD_stepsize',
         default_value='0.2',
-        description='RGD step size'
+        description='RGD stepsize'
     )
     
-    rgd_use_preconditioner_arg = DeclareLaunchArgument(
+    declare_rgd_use_preconditioner_arg = DeclareLaunchArgument(
         'RGD_use_preconditioner',
         default_value='true',
-        description='Use RGD preconditioner'
+        description='RGD use preconditioner flag'
     )
     
-    asynchronous_rate_arg = DeclareLaunchArgument(
+    declare_asynchronous_rate_arg = DeclareLaunchArgument(
         'asynchronous_rate',
         default_value='100',
-        description='Asynchronous update rate'
+        description='Asynchronous rate'
     )
     
-    local_initialization_method_arg = DeclareLaunchArgument(
+    declare_local_initialization_method_arg = DeclareLaunchArgument(
         'local_initialization_method',
         default_value='Chordal',
         description='Local initialization method'
     )
     
-    robot_names_file_arg = DeclareLaunchArgument(
+    declare_robot_names_file_arg = DeclareLaunchArgument(
         'robot_names_file',
-        default_value=PathJoinSubstitution([
-            FindPackageShare('dpgo_ros'),
-            'params',
-            'robot_names.yaml'
-        ]),
-        description='Robot names configuration file'
+        default_value=os.path.join(pkg_share, 'params', 'robot_names.yaml'),
+        description='Robot names file'
     )
     
-    robot_measurements_file_arg = DeclareLaunchArgument(
+    declare_robot_measurements_file_arg = DeclareLaunchArgument(
         'robot_measurements_file',
-        default_value=PathJoinSubstitution([
-            FindPackageShare('dpgo_ros'),
-            'params',
-            'robot_measurements.yaml'
-        ]),
-        description='Robot measurements configuration file'
+        default_value=os.path.join(pkg_share, 'params', 'robot_measurements.yaml'),
+        description='Robot measurements file'
     )
 
     # Dataset publisher node
@@ -94,7 +91,7 @@ def generate_launch_description():
         parameters=[
             {'num_robots': LaunchConfiguration('num_robots')},
             {'g2o_file': PathJoinSubstitution([
-                FindPackageShare('dpgo_ros'),
+                RosFindPackageShare('dpgo_ros'),
                 'data',
                 [LaunchConfiguration('g2o_dataset'), '.g2o']
             ])},
@@ -102,24 +99,18 @@ def generate_launch_description():
         ]
     )
 
-    # PGO Agent launch files for each robot
+    # PGO Agent launch file path
+    pgo_agent_launch_file = os.path.join(pkg_share, 'launch', 'PGOAgent.launch.py')
+
+    # Create PGO agents for each robot
     pgo_agents = []
-    
-    for robot_id in range(5):  # For 5 robots as in original
-        robot_namespace = f'kimera{robot_id}'
-        
-        pgo_agent = GroupAction([
-            PushRosNamespace(robot_namespace),
+    for i in range(5):  # 5 robots as specified in num_robots default
+        robot_group = GroupAction([
+            PushRosNamespace(f'kimera{i}'),
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource([
-                    PathJoinSubstitution([
-                        FindPackageShare('dpgo_ros'),
-                        'launch',
-                        'pgo_agent_launch.py'
-                    ])
-                ]),
+                PythonLaunchDescriptionSource(pgo_agent_launch_file),
                 launch_arguments={
-                    'agent_id': str(robot_id),
+                    'agent_id': str(i),
                     'asynchronous': 'true',
                     'asynchronous_rate': LaunchConfiguration('asynchronous_rate'),
                     'num_robots': LaunchConfiguration('num_robots'),
@@ -131,12 +122,11 @@ def generate_launch_description():
                     'RGD_stepsize': LaunchConfiguration('RGD_stepsize'),
                     'RGD_use_preconditioner': LaunchConfiguration('RGD_use_preconditioner'),
                     'synchronize_measurements': 'true',
-                    'visualize_loop_closures': 'true'
+                    'visualize_loop_closures': 'true',
                 }.items()
             )
         ])
-        
-        pgo_agents.append(pgo_agent)
+        pgo_agents.append(robot_group)
 
     # RViz node
     rviz_node = Node(
@@ -144,29 +134,22 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz',
         output='screen',
-        arguments=['-d', PathJoinSubstitution([
-            FindPackageShare('dpgo_ros'),
-            'rviz',
-            'default.rviz'
-        ])]
+        arguments=['-d', os.path.join(pkg_share, 'rviz', 'default.rviz')]
     )
 
     return LaunchDescription([
-        num_robots_arg,
-        g2o_dataset_arg,
-        debug_arg,
-        verbose_arg,
-        publish_iterate_arg,
-        rgd_stepsize_arg,
-        rgd_use_preconditioner_arg,
-        asynchronous_rate_arg,
-        local_initialization_method_arg,
-        robot_names_file_arg,
-        robot_measurements_file_arg,
+        declare_num_robots_arg,
+        declare_g2o_dataset_arg,
+        declare_debug_arg,
+        declare_verbose_arg,
+        declare_publish_iterate_arg,
+        declare_rgd_stepsize_arg,
+        declare_rgd_use_preconditioner_arg,
+        declare_asynchronous_rate_arg,
+        declare_local_initialization_method_arg,
+        declare_robot_names_file_arg,
+        declare_robot_measurements_file_arg,
         dataset_publisher_node,
         *pgo_agents,
-        rviz_node
+        rviz_node,
     ])
-
-if __name__ == '__main__':
-    generate_launch_description()

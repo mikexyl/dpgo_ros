@@ -1,238 +1,184 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.8)
 project(dpgo_ros)
 
-SET(CMAKE_BUILD_TYPE Debug)
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+SET(CMAKE_BUILD_TYPE Release)
 
 find_package(DPGO REQUIRED)
+find_package(glog REQUIRED)
 
-## Compile as C++11, supported in ROS Kinetic and newer
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++17 -march=native -pthread -O3")
+# find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(pose_graph_tools_msgs REQUIRED)
+find_package(pose_graph_tools_ros REQUIRED)
 
-## Find catkin macros and libraries
-## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
-## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  std_msgs
-  geometry_msgs
-  sensor_msgs
-  visualization_msgs
-  message_generation
-  pose_graph_tools_msgs
-  pose_graph_tools_ros
+# # Compile as C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -march=native -pthread -O3 -DPI=3.14159265358979323846")
+
+# Generate interfaces
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Status.msg"
+  "msg/Command.msg"
+  "msg/MatrixMsg.msg"
+  "msg/PublicPoses.msg"
+  "msg/RelativeMeasurementWeights.msg"
+  "msg/RelativeMeasurementList.msg"
+  "srv/QueryLiftingMatrix.srv"
+  DEPENDENCIES std_msgs geometry_msgs pose_graph_tools_msgs
 )
 
+# Include directories
+include_directories(include)
 
-## System dependencies are found with CMake's conventions
-# find_package(Boost REQUIRED COMPONENTS system)
-
-
-## Uncomment this if the package has a setup.py. This macro ensures
-## modules and global scripts declared therein get installed
-## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-# catkin_python_setup()
-
-################################################
-## Declare ROS messages, services and actions ##
-################################################
-
-## To declare and build messages, services or actions from within this
-## package, follow these steps:
-## * Let MSG_DEP_SET be the set of packages whose message types you use in
-##   your messages/services/actions (e.g. std_msgs, actionlib_msgs, ...).
-## * In the file package.xml:
-##   * add a build_depend tag for "message_generation"
-##   * add a build_depend and a run_depend tag for each package in MSG_DEP_SET
-##   * If MSG_DEP_SET isn't empty the following dependency has been pulled in
-##     but can be declared for certainty nonetheless:
-##     * add a run_depend tag for "message_runtime"
-## * In this file (CMakeLists.txt):
-##   * add "message_generation" and every package in MSG_DEP_SET to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * add "message_runtime" and every package in MSG_DEP_SET to
-##     catkin_package(CATKIN_DEPENDS ...)
-##   * uncomment the add_*_files sections below as needed
-##     and list every .msg/.srv/.action file to be processed
-##   * uncomment the generate_messages entry below
-##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
-
-# Generate messages in the 'msg' folder
- add_message_files(
-   FILES
-   Status.msg
-   Command.msg
-   MatrixMsg.msg
-   PublicPoses.msg
-   RelativeMeasurementWeights.msg
-   RelativeMeasurementList.msg
- )
-
-# Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  QueryLiftingMatrix.srv
-)
-
-## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
-
-## Generate added messages and services with any dependencies listed here
- generate_messages(
-   DEPENDENCIES
-   std_msgs
-   geometry_msgs
-   pose_graph_tools_msgs
- )
-
-################################################
-## Declare ROS dynamic reconfigure parameters ##
-################################################
-
-## To declare and build dynamic reconfigure parameters within this
-## package, follow these steps:
-## * In the file package.xml:
-##   * add a build_depend and a run_depend tag for "dynamic_reconfigure"
-## * In this file (CMakeLists.txt):
-##   * add "dynamic_reconfigure" to
-##     find_package(catkin REQUIRED COMPONENTS ...)
-##   * uncomment the "generate_dynamic_reconfigure_options" section below
-##     and list every .cfg file to be processed
-
-## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
-
-###################################
-## catkin specific configuration ##
-###################################
-## The catkin_package macro generates cmake config files for your package
-## Declare things to be passed to dependent projects
-## INCLUDE_DIRS: uncomment this if your package contains header files
-## LIBRARIES: libraries you create in this project that dependent projects also need
-## CATKIN_DEPENDS: catkin_packages dependent projects also need
-## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-  INCLUDE_DIRS include
-#  LIBRARIES dpgo_ros
-  CATKIN_DEPENDS roscpp rospy std_msgs message_runtime
-#  DEPENDS system_lib
-)
-
-###########
-## Build ##
-###########
-
-## Specify additional locations of header files
-## Your package locations should be listed before other locations
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
-## Declare a C++ library
-add_library(${PROJECT_NAME}
+# Create library
+add_library(${PROJECT_NAME}_lib
   src/PGOAgentROS.cpp
   src/utils.cpp
 )
 
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# Add dependencies to ensure message generation happens first
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(${PROJECT_NAME}_lib "${cpp_typesupport_target}")
 
-target_link_libraries(${PROJECT_NAME}
-  ${catkin_LIBRARIES}
-  DPGO
+ament_target_dependencies(${PROJECT_NAME}_lib
+  rclcpp
+  rclcpp_components
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  visualization_msgs
+  nav_msgs
+  tf2_geometry_msgs
+  pose_graph_tools_msgs
+  pose_graph_tools_ros
 )
 
-# Declare a C++ executable
+target_link_libraries(${PROJECT_NAME}_lib
+  DPGO
+  glog::glog
+)
+
+# Create executables
 add_executable(${PROJECT_NAME}_node src/PGOAgentROSNode.cpp)
 add_executable(${PROJECT_NAME}_dataset_publisher_node src/PGODatasetPublisherNode.cpp)
 
-## Rename C++ executable without prefix
-## The above recommended prefix causes long target names, the following renames the
-## target back to the shorter version for ease of user use
-## e.g. "rosrun someones_pkg node" instead of "rosrun someones_pkg someones_pkg_node"
-# set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX "")
+ament_target_dependencies(${PROJECT_NAME}_node
+  rclcpp
+  rclcpp_components
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  visualization_msgs
+  nav_msgs
+  tf2_geometry_msgs
+  pose_graph_tools_msgs
+  pose_graph_tools_ros
+)
 
-## Add cmake target dependencies of the executable
-## same as for the library above
-add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(${PROJECT_NAME}_dataset_publisher_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+ament_target_dependencies(${PROJECT_NAME}_dataset_publisher_node
+  rclcpp
+  rclcpp_components
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  visualization_msgs
+  nav_msgs
+  tf2_geometry_msgs
+  pose_graph_tools_msgs
+  pose_graph_tools_ros
+)
 
-
-## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
-  ${catkin_LIBRARIES}
-  ${PROJECT_NAME}
+  ${PROJECT_NAME}_lib
 )
 
 target_link_libraries(${PROJECT_NAME}_dataset_publisher_node
-  ${catkin_LIBRARIES}
-  ${PROJECT_NAME}
+  ${PROJECT_NAME}_lib
 )
 
-#############
-## Testing ##
-#############
+# Testing
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  find_package(ament_cmake_gtest REQUIRED)
 
-catkin_add_gtest(test_utils tests/testUtils.cpp)
-target_link_libraries(test_utils ${PROJECT_NAME} -ltbb)
+  # Add gtest
+  ament_add_gtest(test_utils tests/testUtils.cpp)
 
+  if(TARGET test_utils)
+    target_link_libraries(test_utils ${PROJECT_NAME}_lib -ltbb)
+    ament_target_dependencies(test_utils rclcpp)
+  endif()
 
-#############
-## Install ##
-#############
+  # the following line skips the linter which checks for copyrights
+  # comment the line when a copyright and license is added to all source files
+  set(ament_cmake_copyright_FOUND TRUE)
 
-# all install targets should use catkin DESTINATION variables
-# See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
+  # the following line skips cpplint (only works in a git repo)
+  # comment the line when this package is in a git repo and when
+  # a copyright and license is added to all source files
+  set(ament_cmake_cpplint_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
 
-## Mark executable scripts (Python etc.) for installation
-## in contrast to setup.py, you can choose the destination
-# install(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+# Install
+install(TARGETS
+  ${PROJECT_NAME}_lib
+  ${PROJECT_NAME}_node
+  ${PROJECT_NAME}_dataset_publisher_node
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
 
-## Mark executables and/or libraries for installation
-# install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
-#   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-#   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+install(DIRECTORY
+  include/
+  DESTINATION include/
+)
 
-## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
-#   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-#   FILES_MATCHING PATTERN "*.h"
-#   PATTERN ".svn" EXCLUDE
-# )
+install(DIRECTORY
+  launch/
+  DESTINATION share/${PROJECT_NAME}/launch/
+)
 
-## Mark other files for installation (e.g. launch and bag files, etc.)
-# install(FILES
-#   # myfile1
-#   # myfile2
-#   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
-# )
+# install the data folder
+install(DIRECTORY
+  data/
+  DESTINATION share/${PROJECT_NAME}/data/
+)
 
-#############
-## Testing ##
-#############
+# Install params directory if it exists
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/params")
+  install(DIRECTORY
+    params/
+    DESTINATION share/${PROJECT_NAME}/params/
+  )
+endif()
 
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_dpgo_ros.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME}_lib)
+ament_export_dependencies(
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  visualization_msgs
+  rosidl_default_runtime
+  pose_graph_tools_msgs
+  pose_graph_tools_ros
+)
 
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
- 
+ament_package()

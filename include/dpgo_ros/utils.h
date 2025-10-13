@@ -10,22 +10,30 @@
 #include <DPGO/DPGO_types.h>
 #include <DPGO/PGOAgent.h>
 #include <DPGO/RelativeSEMeasurement.h>
-#include <dpgo_ros/MatrixMsg.h>
-#include <dpgo_ros/PublicPoses.h>
-#include <dpgo_ros/Status.h>
-#include <geometry_msgs/PoseArray.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <sensor_msgs/PointCloud.h>
-#include <nav_msgs/Path.h>
-#include <pose_graph_tools_msgs/PoseGraph.h>
-#include <tf/tf.h>
+
+#ifdef PI
+  #undef PI
+#endif
+
+#include <dpgo_ros/msg/matrix_msg.hpp>
+#include <dpgo_ros/msg/public_poses.hpp>
+#include <dpgo_ros/msg/status.hpp>
+#include <geometry_msgs/msg/pose_array.hpp>
+#include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <sensor_msgs/msg/point_cloud.hpp>
+#include <nav_msgs/msg/path.hpp>
+#include <pose_graph_tools_msgs/msg/pose_graph.hpp>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <cassert>
 #include <fstream>
 #include <vector>
 
 using namespace DPGO;
-using pose_graph_tools_msgs::PoseGraphEdge;
+using pose_graph_tools_msgs::msg::PoseGraphEdge;
 
 namespace dpgo_ros {
 
@@ -45,40 +53,40 @@ Matrix deserializeMatrix(size_t rows, size_t cols,
 /**
 Write a matrix to ROS message
 */
-MatrixMsg MatrixToMsg(const Matrix &Mat);
+dpgo_ros::msg::MatrixMsg MatrixToMsg(const Matrix &Mat);
 
 /**
 Read a matrix from ROS message
 */
-Matrix MatrixFromMsg(const MatrixMsg &msg);
+Matrix MatrixFromMsg(const dpgo_ros::msg::MatrixMsg &msg);
 
 /**
  * @brief Retrieve 3-by-3 rotation matrix from geometry_msgs::Pose
  * @param msg
  * @return
  */
-Matrix RotationFromPoseMsg(const geometry_msgs::Pose &msg);
+Matrix RotationFromPoseMsg(const geometry_msgs::msg::Pose &msg);
 
 /**
  * @brief Retrieve 3-by-1 translation vector from geometry_msgs::Pose
  * @param msg
  * @return
  */
-Matrix TranslationFromPoseMsg(const geometry_msgs::Pose &msg);
+Matrix TranslationFromPoseMsg(const geometry_msgs::msg::Pose &msg);
 
 /**
  * @brief Convert a 3-by-3 rotation matrix to quaternion message in ROS
  * @param R
  * @return
  */
-geometry_msgs::Quaternion RotationToQuaternionMsg(const Matrix &R);
+geometry_msgs::msg::Quaternion RotationToQuaternionMsg(const Matrix &R);
 
 /**
  * @brief Convert a 3-by-1 translation vector to point message in ROS
  * @param t
  * @return
  */
-geometry_msgs::Point TranslationToPointMsg(const Matrix &t);
+geometry_msgs::msg::Point TranslationToPointMsg(const Matrix &t);
 
 /**
 Write a relative measurement to ROS message
@@ -93,12 +101,12 @@ RelativeSEMeasurement RelativeMeasurementFromMsg(const PoseGraphEdge &msg);
 /**
 Convert an aggregate matrix T \in (SO(d) \times Rd)^n to a ROS PoseArray message
 */
-geometry_msgs::PoseArray TrajectoryToPoseArray(unsigned d, unsigned n, const Matrix &T);
+geometry_msgs::msg::PoseArray TrajectoryToPoseArray(unsigned d, unsigned n, const Matrix &T);
 
 /**
 Convert an aggregate matrix T \in (SO(d) \times Rd)^n to a ROS Path message
 */
-nav_msgs::Path TrajectoryToPath(unsigned d, unsigned n, const Matrix &T);
+nav_msgs::msg::Path TrajectoryToPath(unsigned d, unsigned n, const Matrix &T);
 
 /**
  * @brief Convert an an aggregate matrix T \in (SO(d) \times Rd)^n to a point cloud message. This message does not contain rotation estimates.
@@ -107,7 +115,7 @@ nav_msgs::Path TrajectoryToPath(unsigned d, unsigned n, const Matrix &T);
  * @param T
  * @return
  */
-sensor_msgs::PointCloud TrajectoryToPointCloud(unsigned d, unsigned n, const Matrix &T);
+sensor_msgs::msg::PointCloud TrajectoryToPointCloud(unsigned d, unsigned n, const Matrix &T);
 
 /**
  * @brief Convert an aggregate matrix T \in (SO(d) \times Rd)^n to a PoseGraph message. Currently only populates the nodes.
@@ -117,26 +125,26 @@ sensor_msgs::PointCloud TrajectoryToPointCloud(unsigned d, unsigned n, const Mat
  * @param T
  * @return
  */
-pose_graph_tools_msgs::PoseGraph TrajectoryToPoseGraphMsg(unsigned robotID, unsigned d, unsigned n, const Matrix &T);
+pose_graph_tools_msgs::msg::PoseGraph TrajectoryToPoseGraphMsg(unsigned robotID, unsigned d, unsigned n, const Matrix &T);
 
 /**
 Compute the number of bytes of a PublicPoses message.
 */
-size_t computePublicPosesMsgSize(const PublicPoses &msg);
+size_t computePublicPosesMsgSize(const dpgo_ros::msg::PublicPoses &msg);
 
 /**
  * @brief Convert a PGOAgentStatus struct to its corresponding ROS message
  * @param status
  * @return
  */
-Status statusToMsg(const PGOAgentStatus &status);
+dpgo_ros::msg::Status statusToMsg(const PGOAgentStatus &status);
 
 /**
  * @brief Create a PGOAgentStatus struct from its corresponding ROS message
  * @param msg
  * @return
  */
-PGOAgentStatus statusFromMsg(const Status &msg);
+PGOAgentStatus statusFromMsg(const dpgo_ros::msg::Status &msg);
 
 /**
  * @brief Sleep for a time randomly distributed in [min_sec, max_sec]

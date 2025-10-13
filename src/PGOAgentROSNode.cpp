@@ -13,12 +13,14 @@
 using namespace DPGO;
 
 /**
-This script implements the entry point for running a single PGO Agent in ROS
+This script implements the entry point for running a single PGO Agent in ROS2
 */
 
 int main(int argc, char **argv) {
-  ros::init(argc, argv, "agent_node");
-  ros::NodeHandle nh;
+  rclcpp::init(argc, argv);
+
+  // Create node with default name first
+  auto node = rclcpp::Node::make_shared("agent");
 
   /**
   ###########################################
@@ -26,9 +28,10 @@ int main(int argc, char **argv) {
   ###########################################
   */
   int ID = -1;
-  ros::param::get("~agent_id", ID);
+  node->declare_parameter("agent_id", -1);
+  ID = node->get_parameter("agent_id").as_int();
   if (ID < 0) {
-    ROS_ERROR_STREAM("Negative agent id! ");
+    RCLCPP_ERROR(node->get_logger(), "Negative agent id!");
     return -1;
   }
 
@@ -40,32 +43,30 @@ int main(int argc, char **argv) {
   int d = -1;
   int r = -1;
   int num_robots = 0;
-  if (!ros::param::get("~num_robots", num_robots)) {
-    ROS_ERROR("Failed to get number of robots!");
-    return -1;
-  }
+
+  node->declare_parameter("num_robots", 0);
+  num_robots = node->get_parameter("num_robots").as_int();
   if (num_robots <= 0) {
-    ROS_ERROR_STREAM("Number of robots must be positive!");
+    RCLCPP_ERROR(node->get_logger(), "Number of robots must be positive!");
     return -1;
   }
   if (ID >= num_robots) {
-    ROS_ERROR_STREAM("ID greater than number of robots!");
+    RCLCPP_ERROR(node->get_logger(), "ID greater than number of robots!");
     return -1;
   }
-  if (!ros::param::get("~dimension", d)) {
-    ROS_ERROR("Failed to get dimension!");
-    return -1;
-  }
-  if (!ros::param::get("~relaxation_rank", r)) {
-    ROS_ERROR("Failed to get relaxation rank!");
-    return -1;
-  }
+
+  node->declare_parameter("dimension", -1);
+  d = node->get_parameter("dimension").as_int();
   if (d != 3) {
-    ROS_ERROR_STREAM("Dimension must be 3!");
+    RCLCPP_ERROR(node->get_logger(), "Dimension must be 3!");
     return -1;
   }
+
+  node->declare_parameter("relaxation_rank", -1);
+  r = node->get_parameter("relaxation_rank").as_int();
   if (r < d) {
-    ROS_ERROR_STREAM("Relaxation rank cannot be smaller than dimension!");
+    RCLCPP_ERROR(node->get_logger(),
+                 "Relaxation rank cannot be smaller than dimension!");
     return -1;
   }
 
@@ -77,7 +78,8 @@ int main(int argc, char **argv) {
   ###########################################
   */
   // Run in asynchronous mode
-  ros::param::get("~asynchronous", params.asynchronous);
+  node->declare_parameter("asynchronous", false);
+  params.asynchronous = node->get_parameter("asynchronous").as_bool();
 
   if (!params.asynchronous) {
     // Synchronous mode
@@ -85,179 +87,275 @@ int main(int argc, char **argv) {
     params.localOptimizationParams.method = ROptParameters::ROptMethod::RTR;
   } else {
     // Asynchronous mode
-    ROS_WARN("Running asynchronous mode.");
+    RCLCPP_WARN(node->get_logger(), "Running asynchronous mode.");
     // Use gradient descent in asynchronous mode
     params.localOptimizationParams.method = ROptParameters::ROptMethod::RGD;
     // Frequency of optimization loop in asynchronous mode
-    ros::param::get("~asynchronous_rate", params.asynchronousOptimizationRate);
+    node->declare_parameter("asynchronous_rate", 10.0);
+    params.asynchronousOptimizationRate =
+        node->get_parameter("asynchronous_rate").as_double();
   }
 
   // Local Riemannian optimization options
-  ros::param::get("~RGD_stepsize", params.localOptimizationParams.RGD_stepsize);
-  ros::param::get("~RGD_use_preconditioner", params.localOptimizationParams.RGD_use_preconditioner);
-  ros::param::get("~RTR_iterations", params.localOptimizationParams.RTR_iterations);
-  ros::param::get("~RTR_tCG_iterations", params.localOptimizationParams.RTR_tCG_iterations);
-  ros::param::get("~RTR_gradnorm_tol", params.localOptimizationParams.gradnorm_tol);
+  node->declare_parameter("RGD_stepsize", 1e-3);
+  params.localOptimizationParams.RGD_stepsize =
+      node->get_parameter("RGD_stepsize").as_double();
+
+  node->declare_parameter("RGD_use_preconditioner", true);
+  params.localOptimizationParams.RGD_use_preconditioner =
+      node->get_parameter("RGD_use_preconditioner").as_bool();
+
+  node->declare_parameter("RTR_iterations", 3);
+  params.localOptimizationParams.RTR_iterations =
+      static_cast<unsigned>(node->get_parameter("RTR_iterations").as_int());
+
+  node->declare_parameter("RTR_tCG_iterations", 50);
+  params.localOptimizationParams.RTR_tCG_iterations =
+      static_cast<unsigned>(node->get_parameter("RTR_tCG_iterations").as_int());
+
+  node->declare_parameter("RTR_gradnorm_tol", 1e-2);
+  params.localOptimizationParams.gradnorm_tol =
+      node->get_parameter("RTR_gradnorm_tol").as_double();
 
   // Local initialization
-  std::string initMethodName;
-  if (ros::param::get("~local_initialization_method", initMethodName)) {
-    if (initMethodName == "Odometry") {
-      params.localInitializationMethod = InitializationMethod::Odometry;
-    }
-    else if (initMethodName == "Chordal") {
-      params.localInitializationMethod = InitializationMethod::Chordal;
-    }
-    else if (initMethodName == "GNC_TLS") {
-      params.localInitializationMethod = InitializationMethod::GNC_TLS;
-    }
-    else {
-      ROS_ERROR_STREAM("Invalid local initialization method: " << initMethodName);
-    }
+  std::string initMethodName = "Odometry";
+  node->declare_parameter("local_initialization_method", initMethodName);
+  initMethodName =
+      node->get_parameter("local_initialization_method").as_string();
+
+  if (initMethodName == "Odometry") {
+    params.localInitializationMethod = InitializationMethod::Odometry;
+  } else if (initMethodName == "Chordal") {
+    params.localInitializationMethod = InitializationMethod::Chordal;
+  } else if (initMethodName == "GNC_TLS") {
+    params.localInitializationMethod = InitializationMethod::GNC_TLS;
+  } else {
+    RCLCPP_ERROR_STREAM(
+        node->get_logger(),
+        "Invalid local initialization method: " << initMethodName);
   }
 
   // Cross-robot initialization
-  ros::param::get("~multirobot_initialization", params.multirobotInitialization);
+  node->declare_parameter("multirobot_initialization", true);
+  params.multirobotInitialization =
+      node->get_parameter("multirobot_initialization").as_bool();
   if (!params.multirobotInitialization) {
-    ROS_WARN("DPGO cross-robot initialization is OFF.");
+    RCLCPP_WARN(node->get_logger(), "DPGO cross-robot initialization is OFF.");
   }
 
   // Nesterov acceleration parameters
-  ros::param::get("~acceleration", params.acceleration);
-  int restart_interval_int;
-  if (ros::param::get("~restart_interval", restart_interval_int)) {
-    params.restartInterval = (unsigned) restart_interval_int;
-  }
+  node->declare_parameter("acceleration", false);
+  params.acceleration = node->get_parameter("acceleration").as_bool();
+
+  int restart_interval_int = 50;
+  node->declare_parameter("restart_interval", restart_interval_int);
+  restart_interval_int = node->get_parameter("restart_interval").as_int();
+  params.restartInterval = (unsigned)restart_interval_int;
 
   // Maximum delayed iterations
-  ros::param::get("~max_delayed_iterations", params.maxDelayedIterations);
+  node->declare_parameter("max_delayed_iterations", 0);
+  params.maxDelayedIterations = static_cast<unsigned>(
+      node->get_parameter("max_delayed_iterations").as_int());
 
   // Inter update sleep time
-  ros::param::get("~inter_update_sleep_time", params.interUpdateSleepTime);
+  node->declare_parameter("inter_update_sleep_time", 0);
+  params.interUpdateSleepTime = static_cast<unsigned>(
+      node->get_parameter("inter_update_sleep_time").as_int());
 
   // Threshold for determining measurement weight convergence
-  ros::param::get("~weight_convergence_threshold", params.weightConvergenceThreshold);
+  node->declare_parameter("weight_convergence_threshold", -1.0);
+  params.weightConvergenceThreshold =
+      node->get_parameter("weight_convergence_threshold").as_double();
 
   // Timeout threshold for considering a robot disconnected
-  ros::param::get("~timeout_threshold", params.timeoutThreshold);
+  node->declare_parameter("timeout_threshold", 15);
+  params.timeoutThreshold =
+      static_cast<unsigned>(node->get_parameter("timeout_threshold").as_int());
 
   // Stopping condition in terms of relative change
-  ros::param::get("~relative_change_tolerance", params.relChangeTol);
+  node->declare_parameter("relative_change_tolerance", 0.1);
+  params.relChangeTol =
+      node->get_parameter("relative_change_tolerance").as_double();
 
   // Verbose flag
-  ros::param::get("~verbose", params.verbose);
+  node->declare_parameter("verbose", false);
+  params.verbose = node->get_parameter("verbose").as_bool();
 
   // Publish iterate during optimization
-  ros::param::get("~publish_iterate", params.publishIterate);
+  node->declare_parameter("publish_iterate", false);
+  params.publishIterate = node->get_parameter("publish_iterate").as_bool();
 
   // Publish loop closures as ROS markers for visualization
-  ros::param::get("~visualize_loop_closures", params.visualizeLoopClosures);
+  node->declare_parameter("visualize_loop_closures", false);
+  params.visualizeLoopClosures =
+      node->get_parameter("visualize_loop_closures").as_bool();
 
   // Completely reset dpgo after each distributed optimization round
-  ros::param::get("~complete_reset", params.completeReset);
+  node->declare_parameter("complete_reset", false);
+  params.completeReset = node->get_parameter("complete_reset").as_bool();
 
   // Try to recover and resume optimization after disconnection
-  ros::param::get("~enable_recovery", params.enableRecovery);
+  node->declare_parameter("enable_recovery", true);
+  params.enableRecovery = node->get_parameter("enable_recovery").as_bool();
 
-  // Synchronize shared measurements between robots before each optimization round
-  ros::param::get("~synchronize_measurements", params.synchronizeMeasurements);
+  // Synchronize shared measurements between robots before each optimization
+  // round
+  node->declare_parameter("synchronize_measurements", true);
+  params.synchronizeMeasurements =
+      node->get_parameter("synchronize_measurements").as_bool();
 
-  // Maximum multi-robot initialization attempts 
-  ros::param::get("~max_distributed_init_steps", params.maxDistributedInitSteps);
+  // Maximum multi-robot initialization attempts
+  node->declare_parameter("max_distributed_init_steps", 30);
+  params.maxDistributedInitSteps = static_cast<unsigned>(
+      node->get_parameter("max_distributed_init_steps").as_int());
 
   // Logging
-  params.logData = ros::param::get("~log_output_path", params.logDirectory);
-  if (params.logDirectory.empty()) {
+  std::string log_output_path = "";
+  node->declare_parameter("log_output_path", log_output_path);
+  log_output_path = node->get_parameter("log_output_path").as_string();
+  if (!log_output_path.empty()) {
+    params.logDirectory = log_output_path;
+    params.logData = true;
+  } else {
     params.logData = false;
   }
 
   // Robust cost function
-  std::string costName;
-  if (ros::param::get("~robust_cost_type", costName)) {
-    if (costName == "L2") {
-      params.robustCostParams.costType = RobustCostParameters::Type::L2;
-    } else if (costName == "L1") {
-      params.robustCostParams.costType = RobustCostParameters::Type::L1;
-    } else if (costName == "Huber") {
-      params.robustCostParams.costType = RobustCostParameters::Type::Huber;
-    } else if (costName == "TLS") {
-      params.robustCostParams.costType = RobustCostParameters::Type::TLS;
-    } else if (costName == "GM") {
-      params.robustCostParams.costType = RobustCostParameters::Type::GM;
-    } else if (costName == "GNC_TLS") {
-      params.robustCostParams.costType = RobustCostParameters::Type::GNC_TLS;
-    } else {
-      ROS_ERROR_STREAM("Unknown robust cost type: " << costName);
-      ros::shutdown();
-    }
+  std::string costName = "L2";
+  node->declare_parameter("robust_cost_type", costName);
+  costName = node->get_parameter("robust_cost_type").as_string();
+
+  if (costName == "L2") {
+    params.robustCostParams.costType = RobustCostParameters::Type::L2;
+  } else if (costName == "L1") {
+    params.robustCostParams.costType = RobustCostParameters::Type::L1;
+  } else if (costName == "Huber") {
+    params.robustCostParams.costType = RobustCostParameters::Type::Huber;
+  } else if (costName == "TLS") {
+    params.robustCostParams.costType = RobustCostParameters::Type::TLS;
+  } else if (costName == "GM") {
+    params.robustCostParams.costType = RobustCostParameters::Type::GM;
+  } else if (costName == "GNC_TLS") {
+    params.robustCostParams.costType = RobustCostParameters::Type::GNC_TLS;
+  } else {
+    RCLCPP_ERROR_STREAM(node->get_logger(),
+                        "Unknown robust cost type: " << costName);
+    rclcpp::shutdown();
+    return -1;
   }
 
   // GNC parameters
   bool gnc_use_quantile = false;
-  ros::param::get("~GNC_use_probability", gnc_use_quantile);
+  node->declare_parameter("GNC_use_probability", gnc_use_quantile);
+  gnc_use_quantile = node->get_parameter("GNC_use_probability").as_bool();
+
   if (gnc_use_quantile) {
     double gnc_quantile = 0.9;
-    ros::param::get("~GNC_quantile", gnc_quantile);
-    double gnc_barc = RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
+    node->declare_parameter("GNC_quantile", gnc_quantile);
+    gnc_quantile = node->get_parameter("GNC_quantile").as_double();
+    double gnc_barc =
+        RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
     params.robustCostParams.GNCBarc = gnc_barc;
-    ROS_INFO("PGOAgentROS: set GNC confidence quantile at %f (barc %f).", gnc_quantile, gnc_barc);
+    RCLCPP_INFO(node->get_logger(),
+                "PGOAgentROS: set GNC confidence quantile at %f (barc %f).",
+                gnc_quantile, gnc_barc);
   } else {
     double gnc_barc = 5.0;
-    ros::param::get("~GNC_barc", gnc_barc);
+    node->declare_parameter("GNC_barc", gnc_barc);
+    gnc_barc = node->get_parameter("GNC_barc").as_double();
     params.robustCostParams.GNCBarc = gnc_barc;
-    ROS_INFO("PGOAgentROS: set GNC barc at %f.", gnc_barc);
-  }
-  ros::param::get("~GNC_mu_step", params.robustCostParams.GNCMuStep);
-  ros::param::get("~GNC_init_mu", params.robustCostParams.GNCInitMu);
-  ros::param::get("~robust_opt_num_weight_updates", params.robustOptNumWeightUpdates);
-  ros::param::get("~robust_opt_num_resets", params.robustOptNumResets);
-  ros::param::get("~robust_opt_min_convergence_ratio", params.robustOptMinConvergenceRatio);
-  int robust_opt_inner_iters_per_robot = 10;
-  ros::param::get("~robust_opt_inner_iters_per_robot", robust_opt_inner_iters_per_robot);
-  params.robustOptInnerIters = num_robots * robust_opt_inner_iters_per_robot;
-  int robust_init_min_inliers;
-  if (ros::param::get("~robust_init_min_inliers", robust_init_min_inliers)) {
-    params.robustInitMinInliers = (unsigned) robust_init_min_inliers;
+    RCLCPP_INFO(node->get_logger(), "PGOAgentROS: set GNC barc at %f.",
+                gnc_barc);
   }
 
+  node->declare_parameter("GNC_mu_step", 2.0);
+  params.robustCostParams.GNCMuStep =
+      node->get_parameter("GNC_mu_step").as_double();
+
+  node->declare_parameter("GNC_init_mu", 1e-5);
+  params.robustCostParams.GNCInitMu =
+      node->get_parameter("GNC_init_mu").as_double();
+
+  node->declare_parameter("robust_opt_num_weight_updates", 4);
+  params.robustOptNumWeightUpdates = static_cast<unsigned>(
+      node->get_parameter("robust_opt_num_weight_updates").as_int());
+
+  node->declare_parameter("robust_opt_num_resets", 0);
+  params.robustOptNumResets = static_cast<unsigned>(
+      node->get_parameter("robust_opt_num_resets").as_int());
+
+  node->declare_parameter("robust_opt_min_convergence_ratio", 0.0);
+  params.robustOptMinConvergenceRatio =
+      node->get_parameter("robust_opt_min_convergence_ratio").as_double();
+
+  int robust_opt_inner_iters_per_robot = 10;
+  node->declare_parameter("robust_opt_inner_iters_per_robot",
+                          robust_opt_inner_iters_per_robot);
+  robust_opt_inner_iters_per_robot =
+      node->get_parameter("robust_opt_inner_iters_per_robot").as_int();
+  params.robustOptInnerIters = num_robots * robust_opt_inner_iters_per_robot;
+
+  int robust_init_min_inliers = 5;
+  node->declare_parameter("robust_init_min_inliers", robust_init_min_inliers);
+  robust_init_min_inliers =
+      node->get_parameter("robust_init_min_inliers").as_int();
+  params.robustInitMinInliers = static_cast<unsigned>(robust_init_min_inliers);
+
   // Maximum number of iterations
-  int max_iters_int;
-  if (ros::param::get("~max_iteration_number", max_iters_int))
-    params.maxNumIters = (unsigned) max_iters_int;
-  // For robust optimization, we set the number of iterations based on the number of GNC iterations
+  int max_iters_int = 1000;
+  node->declare_parameter("max_iteration_number", max_iters_int);
+  max_iters_int = node->get_parameter("max_iteration_number").as_int();
+  params.maxNumIters = static_cast<unsigned>(max_iters_int);
+  // For robust optimization, we set the number of iterations based on the
+  // number of GNC iterations
   if (costName != "L2") {
-    max_iters_int = (params.robustOptNumWeightUpdates + 1) * params.robustOptInnerIters - 2;
+    max_iters_int =
+        (params.robustOptNumWeightUpdates + 1) * params.robustOptInnerIters - 2;
     max_iters_int = std::max(max_iters_int, 0);
-    params.maxNumIters = (unsigned) max_iters_int;
+    params.maxNumIters = (unsigned)max_iters_int;
   }
 
   // Update rule
-  std::string update_rule_str;
-  if (ros::param::get("~update_rule", update_rule_str)) {
-    if (update_rule_str == "Uniform") {
-      params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::Uniform;
-    } else if (update_rule_str == "RoundRobin") {
-      params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::RoundRobin;
-    } else {
-      ROS_ERROR_STREAM("Unknown update rule: " << update_rule_str);
-      ros::shutdown();
-    }
+  std::string update_rule_str = "Uniform";
+  node->declare_parameter("update_rule", update_rule_str);
+  update_rule_str = node->get_parameter("update_rule").as_string();
+
+  if (update_rule_str == "Uniform") {
+    params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::Uniform;
+  } else if (update_rule_str == "RoundRobin") {
+    params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::RoundRobin;
+  } else {
+    RCLCPP_ERROR_STREAM(node->get_logger(),
+                        "Unknown update rule: " << update_rule_str);
+    rclcpp::shutdown();
+    return -1;
   }
 
   // Print params
-  ROS_INFO_STREAM("Initializing PGOAgent " << ID << " with params: \n" << params);
+  RCLCPP_INFO_STREAM(node->get_logger(), "Initializing PGOAgent "
+                                             << ID << " with params: \n"
+                                             << params);
 
   /**
   ###########################################
   Initialize PGO agent
   ###########################################
   */
-  dpgo_ros::PGOAgentROS agent(nh, ID, params);
-  ros::Rate rate(100);
-  while (ros::ok()) {
-    ros::spinOnce();
+  dpgo_ros::PGOAgentROS agent(node, ID, params);
+
+  // // Use a MultiThreadedExecutor so callbacks can run concurrently if needed.
+  // auto exec = std::make_shared<rclcpp::executors::MultiThreadedExecutor>(
+  //     rclcpp::ExecutorOptions(), /*num_threads=*/2);
+  // exec->add_node(node);
+
+  // exec->spin();
+
+  rclcpp::Rate rate(100);
+  while (rclcpp::ok()) {
+    rclcpp::spin_some(node);
     agent.runOnce();
     rate.sleep();
   }
+  rclcpp::shutdown();
   return 0;
 }
