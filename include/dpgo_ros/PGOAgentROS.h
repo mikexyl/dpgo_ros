@@ -11,15 +11,17 @@
 #include <DPGO/PGOAgent.h>
 #include <dpgo_ros/Command.h>
 #include <dpgo_ros/PublicPoses.h>
+#include <dpgo_ros/QueryLiftingMatrix.h>
 #include <dpgo_ros/RelativeMeasurementList.h>
 #include <dpgo_ros/RelativeMeasurementWeights.h>
-#include <dpgo_ros/QueryLiftingMatrix.h>
 #include <dpgo_ros/Status.h>
 #include <pose_graph_tools_msgs/PoseGraph.h>
-#include <visualization_msgs/Marker.h>
-#include <std_msgs/UInt16MultiArray.h>
 #include <ros/console.h>
 #include <ros/ros.h>
+#include <std_msgs/UInt16MultiArray.h>
+#include <visualization_msgs/Marker.h>
+
+#include "dpgo_ros/RerunVisualizer.h"
 
 using namespace DPGO;
 
@@ -28,13 +30,14 @@ namespace dpgo_ros {
 typedef std::vector<ros::Subscriber> SubscriberVector;
 
 /**
- * @brief This class extends PGOAgentParameters with several ROS related settings
+ * @brief This class extends PGOAgentParameters with several ROS related
+ * settings
  */
 class PGOAgentROSParameters : public PGOAgentParameters {
- public:
+public:
   enum class UpdateRule {
-    Uniform, // Uniform sampling 
-    RoundRobin  // Round robin
+    Uniform,   // Uniform sampling
+    RoundRobin // Round robin
   };
 
   // Rule to select the next robot for update
@@ -49,10 +52,12 @@ class PGOAgentROSParameters : public PGOAgentParameters {
   // Completely reset dpgo after each distributed optimization round
   bool completeReset;
 
-  // Synchronize shared measurements between robots before each optimization round
+  // Synchronize shared measurements between robots before each optimization
+  // round
   bool synchronizeMeasurements;
 
-  // Let dpgo try to recover if some robots disconnect during distributed optimization
+  // Let dpgo try to recover if some robots disconnect during distributed
+  // optimization
   bool enableRecovery;
 
   // Maximum attempts for multi-robot initialization
@@ -73,53 +78,54 @@ class PGOAgentROSParameters : public PGOAgentParameters {
   // Default constructor
   PGOAgentROSParameters(unsigned dIn, unsigned rIn, unsigned numRobotsIn)
       : PGOAgentParameters(dIn, rIn, numRobotsIn),
-        updateRule(UpdateRule::Uniform),
-        publishIterate(false),
-        visualizeLoopClosures(false),
-        completeReset(false),
-        synchronizeMeasurements(true),
-        enableRecovery(true),
-        maxDistributedInitSteps(30),
-        maxDelayedIterations(3),
-        weightConvergenceThreshold(1e-6),
-        interUpdateSleepTime(0),
+        updateRule(UpdateRule::Uniform), publishIterate(false),
+        visualizeLoopClosures(false), completeReset(false),
+        synchronizeMeasurements(true), enableRecovery(true),
+        maxDistributedInitSteps(30), maxDelayedIterations(3),
+        weightConvergenceThreshold(1e-6), interUpdateSleepTime(0),
         timeoutThreshold(15) {}
 
-  inline friend std::ostream &operator<<(
-      std::ostream &os, const PGOAgentROSParameters &params) {
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const PGOAgentROSParameters &params) {
     // First print base class
-    os << (const PGOAgentParameters &) params;
+    os << (const PGOAgentParameters &)params;
     // Then print additional options defined in the derived class
     os << "PGOAgentROS parameters: " << std::endl;
-    os << "Update rule: " << updateRuleToString(params.updateRule) << std::endl; 
+    os << "Update rule: " << updateRuleToString(params.updateRule) << std::endl;
     os << "Publish iterate: " << params.publishIterate << std::endl;
-    os << "Visualize loop closures: " << params.visualizeLoopClosures << std::endl;
+    os << "Visualize loop closures: " << params.visualizeLoopClosures
+       << std::endl;
     os << "Complete reset: " << params.completeReset << std::endl;
     os << "Enable recovery: " << params.enableRecovery << std::endl;
-    os << "Synchronize measurements: " << params.synchronizeMeasurements << std::endl;
-    os << "Maximum distributed initialization attempts: " << params.maxDistributedInitSteps << std::endl;
-    os << "Maximum delayed iterations: " << params.maxDelayedIterations << std::endl;
-    os << "Measurement weight convergence threshold: " << params.weightConvergenceThreshold << std::endl;
-    os << "Inter update sleep time: " << params.interUpdateSleepTime << std::endl;
+    os << "Synchronize measurements: " << params.synchronizeMeasurements
+       << std::endl;
+    os << "Maximum distributed initialization attempts: "
+       << params.maxDistributedInitSteps << std::endl;
+    os << "Maximum delayed iterations: " << params.maxDelayedIterations
+       << std::endl;
+    os << "Measurement weight convergence threshold: "
+       << params.weightConvergenceThreshold << std::endl;
+    os << "Inter update sleep time: " << params.interUpdateSleepTime
+       << std::endl;
     os << "Timeout threshold: " << params.timeoutThreshold << std::endl;
     return os;
   }
 
   inline static std::string updateRuleToString(UpdateRule rule) {
     switch (rule) {
-      case UpdateRule::Uniform: {
-        return "Uniform";
-      }
-      case UpdateRule::RoundRobin: {
-        return "RoundRobin";
-      }
+    case UpdateRule::Uniform: {
+      return "Uniform";
+    }
+    case UpdateRule::RoundRobin: {
+      return "RoundRobin";
+    }
     }
     return "";
   }
 };
 
 class PGOAgentROS : public PGOAgent {
- public:
+public:
   PGOAgentROS(const ros::NodeHandle &nh_, unsigned ID,
               const PGOAgentROSParameters &params);
 
@@ -130,7 +136,7 @@ class PGOAgentROS : public PGOAgent {
    */
   void runOnce();
 
- private:
+private:
   // ROS node handle
   ros::NodeHandle nh;
 
@@ -174,9 +180,9 @@ class PGOAgentROS : public PGOAgent {
   std::vector<unsigned> mTeamIterReceived;
   std::vector<unsigned> mTeamIterRequired;
   std::vector<bool> mTeamReceivedSharedLoopClosures;
-  
-  // Store if other robots are currently connected 
-  std::vector<bool> mTeamConnected;  
+
+  // Store if other robots are currently connected
+  std::vector<bool> mTeamConnected;
 
   // Store the current cluster each robot belongs to
   std::vector<unsigned> mTeamClusterID;
@@ -185,8 +191,8 @@ class PGOAgentROS : public PGOAgent {
   std::optional<PoseArray> mCachedPoses;
   std::optional<visualization_msgs::Marker> mCachedLoopClosureMarkers;
 
-  // Store the latest SE(d) poses from neighbors in the global frame 
-  std::map<PoseID, Pose, ComparePoseID> mCachedNeighborPoses; 
+  // Store the latest SE(d) poses from neighbors in the global frame
+  std::map<PoseID, Pose, ComparePoseID> mCachedNeighborPoses;
 
   // Store the latest measurement weights with neighbors
   std::unordered_map<EdgeID, double, HashEdgeID> mCachedEdgeWeights;
@@ -200,7 +206,8 @@ class PGOAgentROS : public PGOAgent {
   // Time this node last performed an iteration
   std::optional<ros::Time> mLastUpdateTime;
 
-  // Reset the pose graph. This function overrides the function from the base class.
+  // Reset the pose graph. This function overrides the function from the base
+  // class.
   void reset() override;
 
   // Tasks to run in synchronous mode at every ROS spin
@@ -289,8 +296,9 @@ class PGOAgentROS : public PGOAgent {
   void publishTrajectory(const PoseArray &T);
   void publishOptimizedTrajectory();
 
-  // Publish trajectory estimates from the latest iteration in distributed optimization.
-  // This function is mostly for visualization and debugging purpose.
+  // Publish trajectory estimates from the latest iteration in distributed
+  // optimization. This function is mostly for visualization and debugging
+  // purpose.
   void publishIterate();
 
   // Publish latest public poses
@@ -330,7 +338,8 @@ class PGOAgentROS : public PGOAgent {
   void commandCallback(const CommandConstPtr &msg);
   void publicPosesCallback(const PublicPosesConstPtr &msg);
   void publicMeasurementsCallback(const RelativeMeasurementListConstPtr &msg);
-  void measurementWeightsCallback(const RelativeMeasurementWeightsConstPtr &msg);
+  void
+  measurementWeightsCallback(const RelativeMeasurementWeightsConstPtr &msg);
   void timerCallback(const ros::TimerEvent &event);
   void visualizationTimerCallback(const ros::TimerEvent &event);
 
@@ -342,10 +351,11 @@ class PGOAgentROS : public PGOAgent {
   ros::Publisher mPublicPosesPublisher;
   ros::Publisher mPublicMeasurementsPublisher;
   ros::Publisher mMeasurementWeightsPublisher;
-  ros::Publisher mPoseArrayPublisher;    // Publish optimized trajectory
-  ros::Publisher mPathPublisher;         // Publish optimized trajectory
-  ros::Publisher mPoseGraphPublisher;    // Publish optimized pose graph
-  ros::Publisher mLoopClosureMarkerPublisher;  // Publish loop closures for visualization
+  ros::Publisher mPoseArrayPublisher; // Publish optimized trajectory
+  ros::Publisher mPathPublisher;      // Publish optimized trajectory
+  ros::Publisher mPoseGraphPublisher; // Publish optimized pose graph
+  ros::Publisher
+      mLoopClosureMarkerPublisher; // Publish loop closures for visualization
 
   // ROS subscriber
   SubscriberVector mLiftingMatrixSubscriber;
@@ -360,8 +370,10 @@ class PGOAgentROS : public PGOAgent {
   // ROS timer
   ros::Timer timer;
   ros::Timer mVisualizationTimer;
+
+  std::unique_ptr<RerunVisualizer> rerun_visualizer_{nullptr};
 };
 
-}  // namespace dpgo_ros
+} // namespace dpgo_ros
 
 #endif

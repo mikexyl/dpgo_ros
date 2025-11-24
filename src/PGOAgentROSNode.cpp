@@ -94,39 +94,46 @@ int main(int argc, char **argv) {
 
   // Local Riemannian optimization options
   ros::param::get("~RGD_stepsize", params.localOptimizationParams.RGD_stepsize);
-  ros::param::get("~RGD_use_preconditioner", params.localOptimizationParams.RGD_use_preconditioner);
-  ros::param::get("~RTR_iterations", params.localOptimizationParams.RTR_iterations);
-  ros::param::get("~RTR_tCG_iterations", params.localOptimizationParams.RTR_tCG_iterations);
-  ros::param::get("~RTR_gradnorm_tol", params.localOptimizationParams.gradnorm_tol);
+  ros::param::get("~RGD_use_preconditioner",
+                  params.localOptimizationParams.RGD_use_preconditioner);
+  ros::param::get("~RTR_iterations",
+                  params.localOptimizationParams.RTR_iterations);
+  ros::param::get("~RTR_tCG_iterations",
+                  params.localOptimizationParams.RTR_tCG_iterations);
+  ros::param::get("~RTR_gradnorm_tol",
+                  params.localOptimizationParams.gradnorm_tol);
 
   // Local initialization
   std::string initMethodName;
   if (ros::param::get("~local_initialization_method", initMethodName)) {
     if (initMethodName == "Odometry") {
       params.localInitializationMethod = InitializationMethod::Odometry;
-    }
-    else if (initMethodName == "Chordal") {
+    } else if (initMethodName == "Chordal") {
       params.localInitializationMethod = InitializationMethod::Chordal;
-    }
-    else if (initMethodName == "GNC_TLS") {
+    } else if (initMethodName == "GNC_TLS") {
       params.localInitializationMethod = InitializationMethod::GNC_TLS;
-    }
-    else {
-      ROS_ERROR_STREAM("Invalid local initialization method: " << initMethodName);
+    } else {
+      ROS_ERROR_STREAM(
+          "Invalid local initialization method: " << initMethodName);
     }
   }
 
   // Cross-robot initialization
-  ros::param::get("~multirobot_initialization", params.multirobotInitialization);
+  ros::param::get("~multirobot_initialization",
+                  params.multirobotInitialization);
   if (!params.multirobotInitialization) {
     ROS_WARN("DPGO cross-robot initialization is OFF.");
   }
 
   // Nesterov acceleration parameters
   ros::param::get("~acceleration", params.acceleration);
+  // CHECK(!params.acceleration,
+  //       "Acceleration turned off for compatibility with CBS");
+  // CHECK(params.asynchronous,
+  //       "Asynchronous mode must be enabled for compatibility with CBS");
   int restart_interval_int;
   if (ros::param::get("~restart_interval", restart_interval_int)) {
-    params.restartInterval = (unsigned) restart_interval_int;
+    params.restartInterval = (unsigned)restart_interval_int;
   }
 
   // Maximum delayed iterations
@@ -136,7 +143,8 @@ int main(int argc, char **argv) {
   ros::param::get("~inter_update_sleep_time", params.interUpdateSleepTime);
 
   // Threshold for determining measurement weight convergence
-  ros::param::get("~weight_convergence_threshold", params.weightConvergenceThreshold);
+  ros::param::get("~weight_convergence_threshold",
+                  params.weightConvergenceThreshold);
 
   // Timeout threshold for considering a robot disconnected
   ros::param::get("~timeout_threshold", params.timeoutThreshold);
@@ -159,11 +167,13 @@ int main(int argc, char **argv) {
   // Try to recover and resume optimization after disconnection
   ros::param::get("~enable_recovery", params.enableRecovery);
 
-  // Synchronize shared measurements between robots before each optimization round
+  // Synchronize shared measurements between robots before each optimization
+  // round
   ros::param::get("~synchronize_measurements", params.synchronizeMeasurements);
 
-  // Maximum multi-robot initialization attempts 
-  ros::param::get("~max_distributed_init_steps", params.maxDistributedInitSteps);
+  // Maximum multi-robot initialization attempts
+  ros::param::get("~max_distributed_init_steps",
+                  params.maxDistributedInitSteps);
 
   // Logging
   params.logData = ros::param::get("~log_output_path", params.logDirectory);
@@ -198,9 +208,11 @@ int main(int argc, char **argv) {
   if (gnc_use_quantile) {
     double gnc_quantile = 0.9;
     ros::param::get("~GNC_quantile", gnc_quantile);
-    double gnc_barc = RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
+    double gnc_barc =
+        RobustCost::computeErrorThresholdAtQuantile(gnc_quantile, 3);
     params.robustCostParams.GNCBarc = gnc_barc;
-    ROS_INFO("PGOAgentROS: set GNC confidence quantile at %f (barc %f).", gnc_quantile, gnc_barc);
+    ROS_INFO("PGOAgentROS: set GNC confidence quantile at %f (barc %f).",
+             gnc_quantile, gnc_barc);
   } else {
     double gnc_barc = 5.0;
     ros::param::get("~GNC_barc", gnc_barc);
@@ -209,26 +221,31 @@ int main(int argc, char **argv) {
   }
   ros::param::get("~GNC_mu_step", params.robustCostParams.GNCMuStep);
   ros::param::get("~GNC_init_mu", params.robustCostParams.GNCInitMu);
-  ros::param::get("~robust_opt_num_weight_updates", params.robustOptNumWeightUpdates);
+  ros::param::get("~robust_opt_num_weight_updates",
+                  params.robustOptNumWeightUpdates);
   ros::param::get("~robust_opt_num_resets", params.robustOptNumResets);
-  ros::param::get("~robust_opt_min_convergence_ratio", params.robustOptMinConvergenceRatio);
+  ros::param::get("~robust_opt_min_convergence_ratio",
+                  params.robustOptMinConvergenceRatio);
   int robust_opt_inner_iters_per_robot = 10;
-  ros::param::get("~robust_opt_inner_iters_per_robot", robust_opt_inner_iters_per_robot);
+  ros::param::get("~robust_opt_inner_iters_per_robot",
+                  robust_opt_inner_iters_per_robot);
   params.robustOptInnerIters = num_robots * robust_opt_inner_iters_per_robot;
   int robust_init_min_inliers;
   if (ros::param::get("~robust_init_min_inliers", robust_init_min_inliers)) {
-    params.robustInitMinInliers = (unsigned) robust_init_min_inliers;
+    params.robustInitMinInliers = (unsigned)robust_init_min_inliers;
   }
 
   // Maximum number of iterations
   int max_iters_int;
   if (ros::param::get("~max_iteration_number", max_iters_int))
-    params.maxNumIters = (unsigned) max_iters_int;
-  // For robust optimization, we set the number of iterations based on the number of GNC iterations
+    params.maxNumIters = (unsigned)max_iters_int;
+  // For robust optimization, we set the number of iterations based on the
+  // number of GNC iterations
   if (costName != "L2") {
-    max_iters_int = (params.robustOptNumWeightUpdates + 1) * params.robustOptInnerIters - 2;
+    max_iters_int =
+        (params.robustOptNumWeightUpdates + 1) * params.robustOptInnerIters - 2;
     max_iters_int = std::max(max_iters_int, 0);
-    params.maxNumIters = (unsigned) max_iters_int;
+    params.maxNumIters = (unsigned)max_iters_int;
   }
 
   // Update rule
@@ -237,7 +254,8 @@ int main(int argc, char **argv) {
     if (update_rule_str == "Uniform") {
       params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::Uniform;
     } else if (update_rule_str == "RoundRobin") {
-      params.updateRule = dpgo_ros::PGOAgentROSParameters::UpdateRule::RoundRobin;
+      params.updateRule =
+          dpgo_ros::PGOAgentROSParameters::UpdateRule::RoundRobin;
     } else {
       ROS_ERROR_STREAM("Unknown update rule: " << update_rule_str);
       ros::shutdown();
@@ -245,7 +263,8 @@ int main(int argc, char **argv) {
   }
 
   // Print params
-  ROS_INFO_STREAM("Initializing PGOAgent " << ID << " with params: \n" << params);
+  ROS_INFO_STREAM("Initializing PGOAgent " << ID << " with params: \n"
+                                           << params);
 
   /**
   ###########################################

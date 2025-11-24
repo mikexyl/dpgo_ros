@@ -4,6 +4,7 @@ project(dpgo_ros)
 SET(CMAKE_BUILD_TYPE Debug)
 
 find_package(DPGO REQUIRED)
+find_package(aria_viz REQUIRED)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++17 -march=native -pthread -O3")
@@ -140,6 +141,7 @@ include_directories(
 add_library(${PROJECT_NAME}
   src/PGOAgentROS.cpp
   src/utils.cpp
+  src/RerunVisualizer.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -151,6 +153,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   DPGO
+  aria_viz
 )
 
 # Declare a C++ executable
