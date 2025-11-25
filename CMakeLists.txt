@@ -5,9 +5,10 @@ SET(CMAKE_BUILD_TYPE Debug)
 
 find_package(DPGO REQUIRED)
 find_package(aria_viz REQUIRED)
+find_package(TBB REQUIRED COMPONENTS tbb tbbmalloc)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++17 -march=native -pthread -O3")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++17 -pthread -O3")
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -154,6 +155,7 @@ target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   DPGO
   aria_viz
+  TBB::tbb TBB::tbbmalloc
 )
 
 # Declare a C++ executable

@@ -235,6 +235,17 @@ int main(int argc, char **argv) {
     params.robustInitMinInliers = (unsigned)robust_init_min_inliers;
   }
 
+  std::string solver_type_str;
+  ros::param::get("~solver_type", solver_type_str);
+  if (solver_type_str == "dc2pgo") {
+    params.solverType = dpgo_ros::PGOAgentROSParameters::SolverType::DC2PGO;
+  } else if (solver_type_str == "cbs") {
+    params.solverType = dpgo_ros::PGOAgentROSParameters::SolverType::CBS;
+  } else {
+    ROS_ERROR_STREAM("Unknown solver type: " << solver_type_str);
+    ros::shutdown();
+  }
+
   // Maximum number of iterations
   int max_iters_int;
   if (ros::param::get("~max_iteration_number", max_iters_int))

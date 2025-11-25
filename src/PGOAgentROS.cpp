@@ -23,7 +23,7 @@ namespace dpgo_ros {
 
 PGOAgentROS::PGOAgentROS(const ros::NodeHandle &nh_, unsigned ID,
                          const PGOAgentROSParameters &params)
-    : PGOAgent(ID, params), nh(nh_), mParamsROS(params), mClusterID(ID),
+    : CBSAgent(ID, params), nh(nh_), mParamsROS(params), mClusterID(ID),
       mInitStepsDone(0), mTotalBytesReceived(0), mIterationElapsedMs(0) {
   mTeamIterRequired.assign(mParams.numRobots, 0);
   mTeamIterReceived.assign(mParams.numRobots, 0);
@@ -103,6 +103,10 @@ PGOAgentROS::PGOAgentROS(const ros::NodeHandle &nh_, unsigned ID,
   mLaunchTime = ros::Time::now();
   mLastCommandTime = ros::Time::now();
   mLastUpdateTime.reset();
+
+  if (mParamsROS.solverType == PGOAgentROSParameters::SolverType::CBS) {
+    CHECK_EQ(mParams.r, 3, "CBS doesn't support relaxation");
+  }
 
   // get time str HHMM
   auto now = std::chrono::system_clock::now();
@@ -244,7 +248,7 @@ void PGOAgentROS::runOnceSynchronous() {
 }
 
 void PGOAgentROS::reset() {
-  PGOAgent::reset();
+  CBSAgent::reset();
   mSynchronousOptimizationRequested = false;
   mTryInitializeRequested = false;
   mInitStepsDone = 0;
@@ -702,17 +706,49 @@ void PGOAgentROS::publishIterate() {
 }
 
 void PGOAgentROS::publishPublicPoses(bool aux) {
+  LOG(INFO) << "publishPublicPoses: aux=" << aux
+            << ", num_neighbors=" << getNeighbors().size()
+            << ", state=" << mState;
+
+  CHECK(not aux);
+
+  if (getNeighbors().empty()) {
+    LOG(WARNING) << "publishPublicPoses: No neighbors found";
+    return;
+  }
+
   for (unsigned neighbor : getNeighbors()) {
+    LOG(INFO) << "Robot " << getID()
+              << " publishPublicPoses: preparing message for neighbor "
+              << neighbor;
+
     PoseDict map;
     if (aux) {
-      if (!getAuxSharedPoseDictWithNeighbor(map, neighbor))
+      LOG(FATAL) << "turn off aux!";
+      if (!getAuxSharedPoseDictWithNeighbor(map, neighbor)) {
+        LOG(WARNING) << "publishPublicPoses: Failed to get aux shared pose "
+                        "dict for neighbor "
+                     << neighbor;
         return;
+      }
     } else {
-      if (!getSharedPoseDictWithNeighbor(map, neighbor))
+      if (!getSharedPoseDictWithNeighbor(map, neighbor)) {
+        LOG(WARNING) << "publishPublicPoses: Failed to get shared pose dict "
+                        "for neighbor "
+                     << neighbor;
         return;
+      }
     }
-    if (map.empty())
+
+    if (map.empty()) {
+      LOG(INFO) << "publishPublicPoses: Empty pose dict for neighbor "
+                << neighbor;
       continue;
+    }
+
+    LOG(INFO) << "Robot " << getID()
+              << " publishPublicPoses: preparing to publish " << map.size()
+              << " poses to neighbor " << neighbor;
 
     PublicPoses msg;
     msg.robot_id = getID();
@@ -728,12 +764,19 @@ void PGOAgentROS::publishPublicPoses(bool aux) {
       CHECK_EQ(nID.robot_id, getID());
       msg.pose_ids.push_back(nID.frame_id);
       msg.poses.push_back(MatrixToMsg(matrix));
+      msg.covariances.push_back(MatrixToMsg(sharedPose.second.Sigma_));
+
+      ROS_DEBUG("Robot %u adding pose %u to message for neighbor %u", getID(),
+                nID.frame_id, neighbor);
     }
+
     mPublicPosesPublisher.publish(msg);
     LOG(INFO) << "Published " << (aux ? "auxiliary " : "") << "public poses "
               << "to robot " << neighbor
               << " (num poses: " << msg.pose_ids.size() << ").";
   }
+
+  LOG(INFO) << "Robot " << getID() << " publishPublicPoses: done.";
 }
 
 void PGOAgentROS::publishPublicMeasurements() {
@@ -1030,7 +1073,6 @@ void PGOAgentROS::statusCallback(const StatusConstPtr &msg) {
   setRobotClusterID(msg->robot_id, msg->cluster_id);
   if (msg->cluster_id == getClusterID()) {
     setNeighborStatus(statusFromMsg(received_msg));
-    ;
   }
 
   // Edge cases in synchronous mode
@@ -1343,6 +1385,7 @@ void PGOAgentROS::commandCallback(const CommandConstPtr &msg) {
 }
 
 void PGOAgentROS::publicPosesCallback(const PublicPosesConstPtr &msg) {
+  CHECK(not msg->is_auxiliary);
 
   // Discard message sent by robots in other clusters
   if (msg->cluster_id != getClusterID()) {
@@ -1361,13 +1404,13 @@ void PGOAgentROS::publicPosesCallback(const PublicPosesConstPtr &msg) {
   for (size_t index = 0; index < msg->pose_ids.size(); ++index) {
     const PoseID nID(msg->robot_id, msg->pose_ids.at(index));
     const auto matrix = MatrixFromMsg(msg->poses.at(index));
+    const auto cov_diag = MatrixFromMsg(msg->covariances.at(index));
     poseDict.emplace(nID, matrix);
+    // Ensure Sigma_ has the correct dimensions before assignment
+    poseDict.at(nID).Sigma_.resize(6, 6);
+    poseDict.at(nID).Sigma_ = cov_diag.asDiagonal();
   }
-  if (!msg->is_auxiliary) {
-    updateNeighborPoses(msg->robot_id, poseDict);
-  } else {
-    updateAuxNeighborPoses(msg->robot_id, poseDict);
-  }
+  updateNeighborPoses(msg->robot_id, poseDict);
 
   // Update local bookkeeping
   mTeamIterReceived[msg->robot_id] = msg->iteration_number;
@@ -1469,15 +1512,18 @@ void PGOAgentROS::timerCallback(const ros::TimerEvent &event) {
     }
   }
   if (mState == PGOAgentState::INITIALIZED) {
-    publishPublicPoses(false);
-    if (mParamsROS.acceleration)
-      publishPublicPoses(true);
+    if (mParamsROS.solverType == PGOAgentROSParameters::SolverType::DC2PGO) {
+      publishPublicPoses(false);
+      if (mParamsROS.acceleration)
+        publishPublicPoses(true);
+    }
     publishMeasurementWeights();
     if (isLeader()) {
       publishAnchor();
       publishActiveRobotsCommand();
     }
   }
+
   publishStatus();
 }
 

@@ -8,6 +8,7 @@
 #ifndef PGOAGENTROS_H
 #define PGOAGENTROS_H
 
+#include <DPGO/CBSAgent.h>
 #include <DPGO/PGOAgent.h>
 #include <dpgo_ros/Command.h>
 #include <dpgo_ros/PublicPoses.h>
@@ -39,6 +40,8 @@ public:
     Uniform,   // Uniform sampling
     RoundRobin // Round robin
   };
+
+  enum class SolverType { DC2PGO = 0, CBS = 1 } solverType;
 
   // Rule to select the next robot for update
   UpdateRule updateRule;
@@ -124,7 +127,7 @@ public:
   }
 };
 
-class PGOAgentROS : public PGOAgent {
+class PGOAgentROS : public CBSAgent {
 public:
   PGOAgentROS(const ros::NodeHandle &nh_, unsigned ID,
               const PGOAgentROSParameters &params);

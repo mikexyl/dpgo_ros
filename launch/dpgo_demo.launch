@@ -1,7 +1,7 @@
 <launch>
   <arg name="num_robots"                            value="5" />
   <arg name="g2o_dataset"                           default="sphere2500" />
-  <arg name="debug"                                 default="false" />
+  <arg name="debug"                                 default="true" />
   <arg name="verbose"                               default="false" />
   <arg name="acceleration"                          default="false"/>
   <arg name="publish_iterate"                       default="true"/>

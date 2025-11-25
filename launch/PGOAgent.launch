@@ -2,14 +2,14 @@
   <!-- debug flags -->
   <!-- GDB: launch-prefix="gnome-terminal -x gdb -ex run \-\-args" -->
   <arg name="debug"                            default="false" />
-  <arg name="launch_prefix"                    value="xterm -e gdb -ex run \-\-args" if="$(arg debug)"/>
+  <arg name="launch_prefix"                    value="kitty -e gdb -ex run \-\-args" if="$(arg debug)"/>
   <arg name="launch_prefix"                    value="" unless="$(arg debug)"/>
 
   <!-- args that needs to be passed in from higher-level launch files -->
   <arg name="agent_id"                         default="0"/>
   <arg name="num_robots"                       default="1" />
   <arg name="dimension"                        default="3" />
-  <arg name="relaxation_rank"                  default="5"/>
+  <arg name="relaxation_rank"                  default="3"/>
   <arg name="asynchronous"                     default="false"/>
   <arg name="asynchronous_rate"                default="10" />
   <arg name="verbose"                          default="false"/>
@@ -48,8 +48,9 @@
   <arg name="weight_convergence_threshold"     default="-1"/>
   <arg name="max_delayed_iterations"           default="0" />
   <arg name="timeout_threshold"                default="15" />
+  <arg name="solver_type"                      default="dc2pgo" />
 
-  <node launch-prefix="$(arg launch_prefix)" ns="dpgo_ros_node" name="agent" pkg="dpgo_ros" type="dpgo_ros_node" output="screen">
+  <node launch-prefix="$(arg launch_prefix)" ns="dpgo_ros_node" name="agent" pkg="dpgo_ros" type="dpgo_ros_node" output="screen" required="true">
     <param name="~agent_id"                         type="int"    value="$(arg agent_id)" />
     <param name="~num_robots"                       type="int"    value="$(arg num_robots)"/>
     <param name="~dimension"                        type="int"    value="$(arg dimension)" />
@@ -91,6 +92,7 @@
     <param name="~max_delayed_iterations"           type="int"    value="$(arg max_delayed_iterations)" />
     <param name="~timeout_threshold"                type="double" value="$(arg timeout_threshold)" />
     <param name="~log_output_path"                  type="str"    value="$(arg log_directory)" />
+    <param name="~solver_type"                      type="str"    value="$(arg solver_type)" />
     <rosparam file="$(arg robot_names_file)" />
   </node>
 

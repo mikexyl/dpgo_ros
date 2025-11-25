@@ -6,3 +6,4 @@ uint16 iteration_number
 bool is_auxiliary
 uint32[] pose_ids                   # Pose IDs of the publishing robot
 dpgo_ros/MatrixMsg[] poses          # Corresponding public poses of the publishing robot
+dpgo_ros/MatrixMsg[] covariances    # Corresponding diagonal covariance matrices of the public poses
