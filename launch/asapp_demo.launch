@@ -1,8 +1,8 @@
 <launch>
   <arg name="num_robots"                            value="5" />
-  <arg name="g2o_dataset"                           default="sphere2500" />
-  <arg name="debug"                                 default="true" />
-  <arg name="verbose"                               default="true" />
+  <arg name="g2o_dataset"                           default="smallGrid3D" />
+  <arg name="debug"                                 default="false" />
+  <arg name="verbose"                               default="false" />
   <arg name="publish_iterate"                       default="true"/>
   <arg name="RGD_stepsize"                          default="0.2" />
   <arg name="RGD_use_preconditioner"                default="true" />

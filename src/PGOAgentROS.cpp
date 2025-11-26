@@ -682,7 +682,7 @@ void PGOAgentROS::publishTrajectory(const PoseArray &T) {
 
     traj_gtsam.push_back(pose_gtsam);
   }
-  auto robot_color = aria::viz::AgentColorMap::get(getID());
+  auto robot_color = aria::viz::AgentColorMap::get(getID() + 'a');
   rerun_visualizer_->drawTrajectory(
       "/world/trajectory/" + mRobotNames.at(getID()), traj_gtsam, robot_color);
 
@@ -711,6 +711,11 @@ void PGOAgentROS::publishTrajectory(const PoseArray &T) {
                                           mRobotNames.at(getID()),
                                       local_traj_gtsam, robot_color);
   }
+
+  auto [factors, values] = getFactorsAndValues();
+  rerun_visualizer_->drawFactors(
+      "/world/factors/" + mRobotNames.at(getID()), *factors, *values,
+      aria::viz::AgentColorMap::get(getID() + 'a'), 1.f);
 }
 
 void PGOAgentROS::publishOptimizedTrajectory() {

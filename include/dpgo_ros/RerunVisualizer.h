@@ -151,6 +151,8 @@ public:
     // get ROS root logger
     log4cxx::LoggerPtr root_logger = log4cxx::Logger::getRootLogger();
     root_logger->addAppender(ros_appender_.get());
+
+    this->addSpdlogToRerun(spdlog::level::info);
   }
 
   virtual ~RerunVisualizer() = default;
