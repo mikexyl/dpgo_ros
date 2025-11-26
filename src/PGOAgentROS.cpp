@@ -685,6 +685,32 @@ void PGOAgentROS::publishTrajectory(const PoseArray &T) {
   auto robot_color = aria::viz::AgentColorMap::get(getID());
   rerun_visualizer_->drawTrajectory(
       "/world/trajectory/" + mRobotNames.at(getID()), traj_gtsam, robot_color);
+
+  // Publish local trajectory
+  Matrix T_local_mat;
+  if (getTrajectoryInLocalFrame(T_local_mat)) {
+    geometry_msgs::PoseArray local_pose_array =
+        TrajectoryToPoseArray(dimension(), num_poses(), T_local_mat);
+
+    nav_msgs::Path local_path =
+        TrajectoryToPath(dimension(), num_poses(), T_local_mat);
+
+    // Publish local trajectory to Rerun
+    std::vector<gtsam::Pose3> local_traj_gtsam;
+    for (size_t i = 0; i < local_path.poses.size(); ++i) {
+      const auto &pose_msg = local_path.poses[i].pose;
+      gtsam::Rot3 R = gtsam::Rot3::Quaternion(
+          pose_msg.orientation.w, pose_msg.orientation.x,
+          pose_msg.orientation.y, pose_msg.orientation.z);
+      gtsam::Point3 t(pose_msg.position.x, pose_msg.position.y,
+                      pose_msg.position.z);
+      gtsam::Pose3 pose_gtsam(R, t);
+      local_traj_gtsam.push_back(pose_gtsam);
+    }
+    rerun_visualizer_->drawTrajectory("/odom/trajectory/" +
+                                          mRobotNames.at(getID()),
+                                      local_traj_gtsam, robot_color);
+  }
 }
 
 void PGOAgentROS::publishOptimizedTrajectory() {
@@ -1607,6 +1633,7 @@ void PGOAgentROS::initializeGlobalAnchor() {
   LiftedPose X(r, d);
   X.rotation() = YLift.value();
   X.translation() = Vector::Zero(r);
+  LOG(INFO) << "Setting global anchor from YLift.";
   setGlobalAnchor(X.getData());
   ROS_INFO("Initialized global anchor.");
 }
