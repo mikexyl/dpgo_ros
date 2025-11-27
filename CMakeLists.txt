@@ -23,6 +23,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   pose_graph_tools_msgs
   pose_graph_tools_ros
+  glog_catkin
 )
 
 

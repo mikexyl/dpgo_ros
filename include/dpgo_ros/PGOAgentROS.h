@@ -191,6 +191,7 @@ private:
   std::vector<unsigned> mTeamClusterID;
 
   // Store the latest optimized trajectory and loop closures for visualization
+  std::mutex mCachedDataMutex;
   std::optional<PoseArray> mCachedPoses;
   std::optional<visualization_msgs::Marker> mCachedLoopClosureMarkers;
 

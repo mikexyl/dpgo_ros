@@ -68,6 +68,7 @@
   <depend>dpgo</depend>
   <depend>pose_graph_tools_msgs</depend>
   <depend>pose_graph_tools_ros</depend>
+  <depend>glog_catkin</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

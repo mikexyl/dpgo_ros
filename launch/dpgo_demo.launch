@@ -2,7 +2,7 @@
   <arg name="num_robots"                            value="5" />
   <arg name="g2o_dataset"                           default="smallGrid3D" />
   <arg name="debug"                                 default="false" />
-  <arg name="verbose"                               default="false" />
+  <arg name="verbose"                               default="true" />
   <arg name="acceleration"                          default="false"/>
   <arg name="publish_iterate"                       default="true"/>
   <arg name="rel_change_tol"                        default="0.2" />

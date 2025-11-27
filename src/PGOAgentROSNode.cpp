@@ -17,6 +17,10 @@ This script implements the entry point for running a single PGO Agent in ROS
 */
 
 int main(int argc, char **argv) {
+  // init glog
+  google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+
   ros::init(argc, argv, "agent_node");
   ros::NodeHandle nh;
 

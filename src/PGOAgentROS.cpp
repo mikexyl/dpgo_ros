@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------------- */
 
 #include <DPGO/DPGO_solver.h>
+#include <DPGO/GTSAM_utils.h>
 #include <dpgo_ros/PGOAgentROS.h>
 #include <dpgo_ros/utils.h>
 #include <geometry_msgs/PoseArray.h>
@@ -118,6 +119,14 @@ PGOAgentROS::PGOAgentROS(const ros::NodeHandle &nh_, unsigned ID,
 
   rerun_visualizer_ = std::make_unique<RerunVisualizer>(
       mRobotNames.at(mID), mRobotNames.at(mID), "odom", "world", time_str);
+
+  setOptWatcher([this](const gtsam::NonlinearFactorGraph &graph,
+                       const gtsam::Values &values) {
+    auto rgba = aria::viz::AgentColorMap::get(mID + 'a');
+    rerun_visualizer_->drawFactors("optimization/" + mRobotNames.at(mID) +
+                                       "/factors",
+                                   graph, values, rgba, 1, true);
+  });
 
   LOG(INFO) << "Initialized PGOAgentROS for robot " << mRobotNames.at(mID);
 }
@@ -649,6 +658,7 @@ void PGOAgentROS::publishStatus() {
 }
 
 void PGOAgentROS::storeOptimizedTrajectory() {
+  std::lock_guard<std::mutex> lock(mCachedDataMutex);
   PoseArray T(dimension(), num_poses());
   if (getTrajectoryInGlobalFrame(T)) {
     mCachedPoses.emplace(T);
@@ -681,6 +691,10 @@ void PGOAgentROS::publishTrajectory(const PoseArray &T) {
     gtsam::Pose3 pose_gtsam(R, t);
 
     traj_gtsam.push_back(pose_gtsam);
+  }
+  if (traj_gtsam.empty()) {
+    LOG(WARNING) << "Empty trajectory, skip publishing to Rerun.";
+    return;
   }
   auto robot_color = aria::viz::AgentColorMap::get(getID() + 'a');
   rerun_visualizer_->drawTrajectory(
@@ -719,10 +733,16 @@ void PGOAgentROS::publishTrajectory(const PoseArray &T) {
 }
 
 void PGOAgentROS::publishOptimizedTrajectory() {
-  if (!isRobotActive(getID()))
+  std::lock_guard<std::mutex> lock(mCachedDataMutex);
+  if (!isRobotActive(getID())) {
+    LOG(WARNING) << "Robot " << getID()
+                 << " is not active. Skip publishing trajectory.";
     return;
-  if (!mCachedPoses.has_value())
+  }
+  if (!mCachedPoses.has_value()) {
+    LOG(WARNING) << "No cached trajectory to publish!";
     return;
+  }
   publishTrajectory(mCachedPoses.value());
 }
 
@@ -800,6 +820,21 @@ void PGOAgentROS::publishPublicPoses(bool aux) {
       ROS_DEBUG("Robot %u adding pose %u to message for neighbor %u", getID(),
                 nID.frame_id, neighbor);
     }
+
+    gtsam::Pose3 T_w_o;
+    if (T_w_o_.has_value()) {
+      T_w_o = T_w_o_.value();
+    } else {
+      T_w_o = gtsam::Pose3();
+    }
+
+    Eigen::Matrix<double, 3, 4> local_origin_mat;
+    local_origin_mat.block<3, 3>(0, 0) = T_w_o.rotation().matrix();
+    local_origin_mat.block<3, 1>(0, 3) = T_w_o.translation();
+    Pose local_origin(local_origin_mat);
+
+    msg.local_origin.resize(1);
+    msg.local_origin.at(0) = MatrixToMsg(local_origin_mat);
 
     mPublicPosesPublisher.publish(msg);
     LOG(INFO) << "Published " << (aux ? "auxiliary " : "") << "public poses "
@@ -1443,6 +1478,9 @@ void PGOAgentROS::publicPosesCallback(const PublicPosesConstPtr &msg) {
   }
   updateNeighborPoses(msg->robot_id, poseDict);
 
+  updateNeighborLocalOrigin(msg->robot_id,
+                            Pose(MatrixFromMsg(msg->local_origin.at(0))));
+
   // Update local bookkeeping
   mTeamIterReceived[msg->robot_id] = msg->iteration_number;
   mTotalBytesReceived += computePublicPosesMsgSize(*msg);
@@ -1552,10 +1590,24 @@ void PGOAgentROS::timerCallback(const ros::TimerEvent &event) {
     if (isLeader()) {
       publishAnchor();
       publishActiveRobotsCommand();
+
+      // In async mode, periodically request new pose graphs when converged
+      if (mParams.asynchronous && shouldTerminate()) {
+        int elapsed_sec = (ros::Time::now() - mLastResetTime).toSec();
+        // Request new pose graph every 10 seconds after convergence
+        if (elapsed_sec > 10) {
+          ROS_INFO("Leader robot %u: converged in async mode, requesting new "
+                   "pose graph",
+                   getID());
+          publishRequestPoseGraphCommand();
+          mLastResetTime = ros::Time::now(); // Reset timer to avoid spamming
+        }
+      }
     }
   }
 
   publishStatus();
+  storeOptimizedTrajectory();
 }
 
 void PGOAgentROS::visualizationTimerCallback(const ros::TimerEvent &event) {

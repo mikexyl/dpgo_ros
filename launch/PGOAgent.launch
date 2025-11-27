@@ -50,7 +50,7 @@
   <arg name="timeout_threshold"                default="15" />
   <arg name="solver_type"                      default="dc2pgo" />
 
-  <node launch-prefix="$(arg launch_prefix)" ns="dpgo_ros_node" name="agent" pkg="dpgo_ros" type="dpgo_ros_node" output="screen" required="true">
+  <node launch-prefix="$(arg launch_prefix)" ns="dpgo_ros_node" name="agent" pkg="dpgo_ros" type="dpgo_ros_node" output="screen" required="true" args="-v 1">
     <param name="~agent_id"                         type="int"    value="$(arg agent_id)" />
     <param name="~num_robots"                       type="int"    value="$(arg num_robots)"/>
     <param name="~dimension"                        type="int"    value="$(arg dimension)" />

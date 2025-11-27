@@ -2,11 +2,11 @@
   <arg name="num_robots"                            value="5" />
   <arg name="g2o_dataset"                           default="smallGrid3D" />
   <arg name="debug"                                 default="false" />
-  <arg name="verbose"                               default="false" />
+  <arg name="verbose"                               default="true" />
   <arg name="publish_iterate"                       default="true"/>
   <arg name="RGD_stepsize"                          default="0.2" />
   <arg name="RGD_use_preconditioner"                default="true" />
-  <arg name="asynchronous_rate"                     default="100" />
+  <arg name="asynchronous_rate"                     default="1" />
   <arg name="local_initialization_method"           default="Chordal" />
   <arg name="robot_names_file"                      default="$(find dpgo_ros)/params/robot_names.yaml"/>
   <arg name="robot_measurements_file"               default="$(find dpgo_ros)/params/robot_measurements.yaml"/>
